@@ -420,29 +420,41 @@ permalink: /appointment.html
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { reassignDailyTokens, countStillWaitingAhead } from "./token-utils.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDstFH1FUnW3YQVk-XUWC5rjMWuWxo5jjA",
-            authDomain: "appointment-booking-1f0d0.firebaseapp.com",
-            projectId: "appointment-booking-1f0d0",
-            storageBucket: "appointment-booking-1f0d0.firebasestorage.app",
-            messagingSenderId: "572909099522",
-            appId: "1:572909099522:web:a40cb6dc7fafe8ea7e651b"
+        // This form is the single shared booking entry point for both
+        // clinics — each backend owns its own appointment data, so a
+        // booking here is routed to the right one at submit time rather
+        // than written to a shared/legacy database.
+        //
+        // Consultation goes through ASC_consultation's public booking API
+        // (server-side slot + token-queue validation, same as its own
+        // /book/[clinicId] page) rather than a direct Firestore write,
+        // since that app's queue numbering has to be recomputed atomically
+        // across every appointment that day — logic that only exists
+        // server-side. Laser Hair Removal has no such queue system in
+        // RadianceLaser, so it writes directly into RadianceLaser's
+        // Firestore (allowed by a narrowly-scoped public rule — see
+        // RadianceLaser/firestore.rules isValidPublicLhrBooking).
+        const CONSULTATION_API_BASE = "https://open.advancedskinclinic.in";
+        const CONSULTATION_CLINIC_ID = "XF9qpYnL3K3fGHhC8bpl";
+
+        const RADIANCE_API_BASE = "https://radiancelaser.in";
+        const RADIANCE_CLINIC_ID = "ISXpiVfsWsryqAKIYz70";
+        const radianceFirebaseConfig = {
+            apiKey: "AIzaSyCDAZrX3ZWXae4bIj5vsCbHt5wK1Djta64",
+            authDomain: "radiancelaser-c9bd4.firebaseapp.com",
+            projectId: "radiancelaser-c9bd4",
+            storageBucket: "radiancelaser-c9bd4.firebasestorage.app",
+            messagingSenderId: "1035339144812",
+            appId: "1:1035339144812:web:7ffb7d18cd73a444638249"
         };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const radianceApp = initializeApp(radianceFirebaseConfig);
+        const radianceDb = getFirestore(radianceApp);
 
         const serviceInput = document.getElementById('service');
         const dateInput = document.getElementById('date');
         const timeSelect = document.getElementById('time');
-
-        // Declared before flatpickr() below because its onReady/onChange
-        // callbacks fire synchronously during init and call
-        // updateAvailableTimeSlots(), which reads this variable.
-        let unsubscribeSlots = null;
 
         // --- TIME FORMATTING HELPER ---
         function formatTo12Hour(timeStr) {
@@ -487,38 +499,53 @@ permalink: /appointment.html
             }
         });
 
-        // --- GENERATE AND SYNC SLOT CONFLICTS ---
+        // --- GENERATE TIME SLOTS ---
+        // Consultation's windows/interval mirror ASC_consultation's own
+        // lib/slots.ts exactly (10-min slots, 10:00-14:00 / 16:00-20:00) so
+        // a slot offered here is always one the booking API will actually
+        // accept. Laser Hair Removal has no such source of truth in
+        // RadianceLaser, so it keeps its own 60-minute clinic hours.
         function generateTimeSlots(service) {
-            // Laser Hair Removal uses 60-minute slots; Consultation (and anything else) uses 10-minute slots
-            const interval = service === 'Laser Hair Removal' ? 60 : 10;
+            const isLaser = service === 'Laser Hair Removal';
+            const interval = isLaser ? 60 : 10;
             const slots = [];
 
-            function addSlotsInRange(startHour, startMin, endHour, endMin) {
+            function addSlotsInRange(startHour, startMin, endHour, endMin, inclusive) {
                 const startTotalMins = startHour * 60 + startMin;
                 const endTotalMins = endHour * 60 + endMin;
 
-                for (let m = startTotalMins; m <= endTotalMins; m += interval) {
+                for (let m = startTotalMins; inclusive ? m <= endTotalMins : m < endTotalMins; m += interval) {
                     const hh = String(Math.floor(m / 60)).padStart(2, '0');
                     const mins = String(m % 60).padStart(2, '0');
                     slots.push(`${hh}:${mins}`);
                 }
             }
 
-            // Morning shift: 10:00 AM to 1:30 PM (13:30)
-            addSlotsInRange(10, 0, 13, 30);
-
-            // Add a clear text divider flag for the dropdown renderer to catch
-            slots.push("DIVIDER");
-
-            // Afternoon/Evening shift: 4:30 PM (16:30) to 7:30 PM (19:30)
-            addSlotsInRange(16, 30, 19, 30);
+            if (isLaser) {
+                addSlotsInRange(10, 0, 13, 30, true);
+                slots.push("DIVIDER");
+                addSlotsInRange(16, 30, 19, 30, true);
+            } else {
+                addSlotsInRange(10, 0, 14, 0, false);
+                slots.push("DIVIDER");
+                addSlotsInRange(16, 0, 20, 0, false);
+            }
 
             return slots;
         }
 
-        function updateAvailableTimeSlots() {
-            if (unsubscribeSlots) unsubscribeSlots();
+        function fetchBookedTimes(service, date) {
+            if (service === 'Laser Hair Removal') {
+                const url = `${RADIANCE_API_BASE}/api/public/availability?clinicId=${encodeURIComponent(RADIANCE_CLINIC_ID)}&sessionType=lhr&date=${encodeURIComponent(date)}`;
+                return fetch(url).then((res) => res.json()).then((data) => data.bookedTimes ?? []);
+            }
+            const url = `${CONSULTATION_API_BASE}/api/book/${encodeURIComponent(CONSULTATION_CLINIC_ID)}/availability?date=${encodeURIComponent(date)}`;
+            return fetch(url).then((res) => res.json()).then((data) => data.bookedTimes ?? []);
+        }
 
+        let availabilityRequestId = 0;
+
+        async function updateAvailableTimeSlots() {
             const selectedService = serviceInput.value;
             // Get raw YYYY-MM-DD from Flatpickr
             const selectedDate = document.getElementById('date').value;
@@ -527,49 +554,45 @@ permalink: /appointment.html
 
             const timeSlots = generateTimeSlots(selectedService);
 
-            const q = query(
-                collection(db, "appointments"),
-                where("service_type", "==", selectedService),
-                where("appointment_date", "==", selectedDate)
-            );
+            // Guards against a slower earlier request resolving after a
+            // faster later one and clobbering the dropdown with stale data.
+            const requestId = ++availabilityRequestId;
+            let bookedTimesList = [];
+            try {
+                bookedTimesList = await fetchBookedTimes(selectedService, selectedDate);
+            } catch (err) {
+                console.error('Failed to load availability:', err);
+            }
+            if (requestId !== availabilityRequestId) return;
 
-            unsubscribeSlots = onSnapshot(q, (snapshot) => {
-                const bookedTimes = new Set();
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if (data.appointment_time) {
-                        bookedTimes.add(data.appointment_time);
-                    }
-                });
+            const bookedTimes = new Set(bookedTimesList);
+            const currentSelection = timeSelect.value;
+            timeSelect.innerHTML = '<option value="" disabled selected>-- Select Time --</option>';
 
-                const currentSelection = timeSelect.value;
-                timeSelect.innerHTML = '<option value="" disabled selected>-- Select Time --</option>';
-
-                timeSlots.forEach(slot => {
-                    // Check for our custom separator
-                    if (slot === "DIVIDER") {
-                        const divider = document.createElement('option');
-                        divider.disabled = true;
-                        divider.textContent = '────── Evening ──────';
-                        timeSelect.appendChild(divider);
-                        return; // exit current loop cycle
-                    }
-
-                    const option = document.createElement('option');
-                    option.value = slot;
-                    option.textContent = formatTo12Hour(slot); // Render to user as 12hr
-
-                    if (bookedTimes.has(slot)) {
-                        option.disabled = true;
-                        option.textContent += ' (Booked)';
-                    }
-                    timeSelect.appendChild(option);
-                });
-
-                if (currentSelection && !bookedTimes.has(currentSelection)) {
-                    timeSelect.value = currentSelection;
+            timeSlots.forEach(slot => {
+                // Check for our custom separator
+                if (slot === "DIVIDER") {
+                    const divider = document.createElement('option');
+                    divider.disabled = true;
+                    divider.textContent = '────── Evening ──────';
+                    timeSelect.appendChild(divider);
+                    return; // exit current loop cycle
                 }
+
+                const option = document.createElement('option');
+                option.value = slot;
+                option.textContent = formatTo12Hour(slot); // Render to user as 12hr
+
+                if (bookedTimes.has(slot)) {
+                    option.disabled = true;
+                    option.textContent += ' (Booked)';
+                }
+                timeSelect.appendChild(option);
             });
+
+            if (currentSelection && !bookedTimes.has(currentSelection)) {
+                timeSelect.value = currentSelection;
+            }
         }
 
         serviceInput.addEventListener('change', updateAvailableTimeSlots);
@@ -585,41 +608,42 @@ permalink: /appointment.html
             const time = timeSelect.value;
 
             try {
-                // Combined single transaction layout schema payload tracking
-                const newDocRef = await addDoc(collection(db, "appointments"), {
-                    service_type: service,
-                    patient_name: name,
-                    patient_phone: phone,
-                    appointment_date: date,
-                    appointment_time: time, // Send purely as 24-hr layout securely matching admin dashboard
-                    status: "Booked",
-                    entry_source: "online",
-                    createdAt: new Date(),
-                    whatsapp_sent: false, // picked up by the WhatsApp notifier bot
-                    // Placeholders prevent structural query errors on admin data loops
-                    payment: "",
-                    payment_type: "",
-                    reference: "",
-                    follow_up: ""
-                });
-
-                // Join the shared, time-ordered token queue for this service+date.
-                const dayEntries = await reassignDailyTokens(db, service, date);
-                const mine = dayEntries.find(e => e.id === newDocRef.id);
-                const tokenNumber = mine ? mine.token_number : '';
-                const aheadCount = mine ? countStillWaitingAhead(dayEntries, newDocRef.id) : '';
+                if (service === 'Laser Hair Removal') {
+                    await addDoc(collection(radianceDb, "appointments"), {
+                        clinicId: RADIANCE_CLINIC_ID,
+                        patientId: "",
+                        patientName: name,
+                        patientPhone: phone,
+                        sessionType: "lhr",
+                        date: date,
+                        time: time,
+                        durationMinutes: 60,
+                        status: "booked",
+                        notes: "",
+                        createdAt: Date.now()
+                    });
+                } else {
+                    const res = await fetch(`${CONSULTATION_API_BASE}/api/book/${encodeURIComponent(CONSULTATION_CLINIC_ID)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, phone, date, time })
+                    });
+                    const result = await res.json();
+                    if (!res.ok || result.error) {
+                        alert(result.error || "Something went wrong. Please try again.");
+                        return;
+                    }
+                }
 
                 const params = new URLSearchParams({
                     name: name,
                     date: date,
                     time: formatTo12Hour(time), // Format for nice display on the confirmation page
-                    service: service,
-                    token: tokenNumber,
-                    ahead: aheadCount
+                    service: service
                 });
                 window.location.href = `confirmation.html?${params.toString()}`;
             } catch (error) {
-                console.error("Error writing to cloud database: ", error);
+                console.error("Error submitting appointment: ", error);
                 alert("Something went wrong. Please try again.");
             }
         });
