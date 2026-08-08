@@ -82,7 +82,7 @@ nav.links .dropdown a:hover{background:var(--cream);}
 .hero-actions{display:flex;gap:16px;align-items:center;margin-bottom:36px;}
 .hero-note{font-size:13px;color:var(--ink-soft);}
 .hero-stats{display:flex;gap:36px;padding-top:28px;border-top:1px solid var(--line);max-width:460px;}
-.stat b{display:block;font-size:26px;font-family:Georgia,serif;color:var(--ink);}
+.stat b{display:block;font-size:26px;font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;color:var(--ink);}
 .stat span{font-size:13px;color:var(--ink-soft);}
 .hero-photo{position:relative;}
 .hero-photo .frame{

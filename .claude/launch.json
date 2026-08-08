@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "asc-new-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8793", "--directory", "/Users/harsh/Developer/ASC_web/advancedskinclinic-new/_site"],
+      "port": 8793
+    }
+  ]
+}
