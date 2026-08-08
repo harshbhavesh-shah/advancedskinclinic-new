@@ -1,0 +1,27 @@
+---
+layout: base.njk
+---
+<section class="page-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/">Home</a> / <a href="/blog/">Blog</a> / {{ crumbTitle }}</div>
+    <h1>{{ pageTitle or title }}</h1>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="prose">
+      {{ content | safe }}
+    </div>
+  </div>
+</section>
+
+<section id="book">
+  <div class="cta-band">
+    <h2>Have questions about this?</h2>
+    <div class="cta-band-actions">
+      <a href="/contact/" class="cta-btn">Talk to Us</a>
+      <a href="tel:+918460000120" class="cta-ghost">Call 8460000120</a>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+{% if description %}<meta name="description" content="{{ description }}">{% endif %}
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+{% include "partials/header.njk" %}
+
+{{ content | safe }}
+
+{% include "partials/footer.njk" %}
+
+<script>
+document.querySelectorAll('.faq-item h4').forEach(function(h4){
+  h4.addEventListener('click', function(){
+    h4.parentElement.classList.toggle('open');
+  });
+});
+document.querySelector('.mobile-toggle')?.addEventListener('click', function(){
+  document.querySelector('nav.links').classList.toggle('mobile-open');
+});
+</script>
+</body>
+</html>
