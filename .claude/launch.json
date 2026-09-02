@@ -3,9 +3,15 @@
   "configurations": [
     {
       "name": "asc-new-site",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8793", "--directory", "/Users/harsh/Developer/ASC_web/advancedskinclinic-new/_site"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["@11ty/eleventy", "--serve", "--port=8793", "--config=eleventy.config.js"],
       "port": 8793
+    },
+    {
+      "name": "aurel-store",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/harsh/Developer/ASC_web/ecommerce-store", "run", "dev", "--", "-p", "3010"],
+      "port": 3010
     }
   ]
 }
