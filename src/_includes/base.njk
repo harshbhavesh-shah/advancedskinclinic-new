@@ -24,8 +24,19 @@ document.querySelectorAll('.faq-item h4').forEach(function(h4){
     h4.parentElement.classList.toggle('open');
   });
 });
-document.querySelector('.mobile-toggle')?.addEventListener('click', function(){
-  document.querySelector('nav.links').classList.toggle('mobile-open');
+var mobileToggle = document.querySelector('.mobile-toggle');
+var navLinks = document.querySelector('nav.links');
+mobileToggle?.addEventListener('click', function(){
+  var isOpen = navLinks.classList.toggle('mobile-open');
+  mobileToggle.classList.toggle('open', isOpen);
+  mobileToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+});
+navLinks?.querySelectorAll('a').forEach(function(a){
+  a.addEventListener('click', function(){
+    navLinks.classList.remove('mobile-open');
+    mobileToggle.classList.remove('open');
+    mobileToggle.setAttribute('aria-expanded', 'false');
+  });
 });
 </script>
 </body>
