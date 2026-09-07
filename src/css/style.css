@@ -22,10 +22,13 @@ body{
 h1,h2,h3,.serif{ font-family:'Fraunces',Georgia,serif; font-weight:500; letter-spacing:-.01em; }
 img{max-width:100%;display:block;}
 a{color:inherit;text-decoration:none;}
-.wrap{max-width:var(--content-width);margin:0 auto;padding:0 40px;}
+.wrap{max-width:var(--content-width);margin:0 auto;padding:0 48px;}
 
-@media(min-width:1500px){
+@media(min-width:1200px){
   .wrap{padding:0 56px;}
+}
+@media(min-width:1500px){
+  .wrap{padding:0 64px;}
 }
 
 /* header */
@@ -35,7 +38,7 @@ header{
   backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
 }
-.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0;gap:20px;}
+.nav{display:flex;align-items:center;justify-content:space-between;padding-top:18px;padding-bottom:18px;gap:20px;}
 .logo{font-size:17px;font-weight:600;letter-spacing:.1px;white-space:nowrap;flex:0 0 auto;display:flex;align-items:center;gap:10px;color:var(--ink);font-family:'Fraunces',Georgia,serif;}
 .logo-mark{height:32px;width:32px;object-fit:contain;flex:0 0 auto;border-radius:8px;}
 .logo-text{white-space:nowrap;}
