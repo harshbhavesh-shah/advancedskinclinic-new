@@ -365,14 +365,8 @@ permalink: /confirmation.html
         }
 
         if (time) {
-            const [hh, mm] = time.split(':');
-            const timeDate = new Date();
-            timeDate.setHours(Number(hh), Number(mm), 0);
-            document.getElementById('detailTime').textContent = timeDate.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-            });
+            // The booking page sends this already formatted (e.g. "10:30 AM").
+            document.getElementById('detailTime').textContent = time;
         }
 
         // If someone lands here directly with no details, hide the details box gracefully
